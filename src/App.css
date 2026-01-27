@@ -1,0 +1,26 @@
+/* 
+.container{
+    background-color: aqua;
+    padding: 5px;
+}
+.row{
+    background-color:blueviolet;
+   
+}
+.col{
+    background-color:rgb(34, 172, 57);
+    padding: 5px;
+    border: 2px solid black;
+}
+.row{
+    margin-left: 0;
+    margin-right: 0;
+}
+
+ */
+
+ ul{
+
+    text-decoration: none;
+    display: inline;
+ }
