@@ -1,29 +1,43 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
 const LearnWithAudio = () => {
-  const [isListening, setIsListening] = useState(false);
-  const [hindiText, setHindiText] = useState('');
   const [englishTranslation, setEnglishTranslation] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const recognitionRef = useRef(null);
+  const [error, setError] = useState('');
+  const [lang, setLang] = useState('hi-IN');
+
+  // Advanced: Use library for better mobile support
+  const {
+    transcript,
+    listening,
+    resetTranscript,
+    browserSupportsSpeechRecognition,
+    isMicrophoneAvailable
+  } = useSpeechRecognition();
 
   useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.lang = 'hi-IN';
-      recognitionRef.current.continuous = false;
+    // HTTPS check
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+      setError('Requires HTTPS on mobile. Deploy to secure server.');
+    }
 
-      recognitionRef.current.onresult = async (event) => {
-        const text = event.results[0][0].transcript;
-        setHindiText(text);
-        await translateToEnglish(text);
-      };
+    // Log device info for debugging
+    console.log('Browser:', navigator.userAgent);
+    console.log('Supports Speech:', browserSupportsSpeechRecognition);
+    console.log('Mic Available:', isMicrophoneAvailable);
 
-      recognitionRef.current.onend = () => setIsListening(false);
-      recognitionRef.current.onerror = () => setIsListening(false);
+    if (!browserSupportsSpeechRecognition) {
+      setError('Speech recognition not supported. Try Chrome/Samsung Internet on Android.');
     }
   }, []);
+
+  useEffect(() => {
+    // Auto-translate when transcript changes
+    if (transcript) {
+      translateToEnglish(transcript);
+    }
+  }, [transcript]);
 
   const translateToEnglish = async (text) => {
     if (!text) return;
@@ -36,40 +50,64 @@ const LearnWithAudio = () => {
       setEnglishTranslation(translated);
       speakEnglish(translated);
     } catch (error) {
-      setEnglishTranslation("Translation failed. Try again.");
+      setEnglishTranslation("Translation failed.");
+      setError("Translation error. Check internet.");
+      console.error('Translation error:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const speakEnglish = (text) => {
-    window.speechSynthesis.cancel();
-    const msg = new SpeechSynthesisUtterance(text);
-    msg.lang = 'en-US';
-    msg.rate = 0.9;
-    window.speechSynthesis.speak(msg);
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      const msg = new SpeechSynthesisUtterance(text);
+      msg.lang = 'en-US';
+      msg.rate = 0.9;
+      window.speechSynthesis.speak(msg);
+    } else {
+      setError("Speech synthesis not supported.");
+    }
   };
 
   const startListening = () => {
-    setHindiText('');
+    resetTranscript();
     setEnglishTranslation('');
-    setIsListening(true);
-    recognitionRef.current.start();
+    setError('');
+
+    // Advanced: Request permission explicitly
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(() => {
+          SpeechRecognition.startListening({
+            language: lang,
+            continuous: false, // Off for mobile
+          });
+        })
+        .catch((err) => {
+          setError("Microphone denied. Allow in browser settings > Site settings > Microphone.");
+          console.error('Permission error:', err);
+        });
+    } else {
+      SpeechRecognition.startListening({ language: lang, continuous: false });
+    }
+  };
+
+  const stopListening = () => {
+    SpeechRecognition.stopListening();
   };
 
   return (
     <div style={styles.container}>
-
       <div style={styles.innerWrap}>
-
         <div style={styles.displayArea}>
           <div style={styles.resultBox}>
-            <small>Hindi Sentences:</small>
-            <p style={styles.hindiText}>{hindiText || "..."}</p>
+            <small>{lang === 'hi-IN' ? 'Hindi Input' : 'English Input'}:</small>
+            <p style={styles.hindiText}>{transcript || "..."}</p>
           </div>
 
           <div style={{...styles.resultBox, borderLeft: '5px solid #2e7d32', backgroundColor: '#e8f5e9'}}>
-            <small>English Sentences:</small>
+            <small>English Translation:</small>
             <p style={styles.engText}>
               {isLoading ? "Translating..." : englishTranslation || "..."}
             </p>
@@ -79,25 +117,36 @@ const LearnWithAudio = () => {
         <div style={styles.inputWrapper}>
           <button 
             onClick={startListening} 
-            disabled={isListening || isLoading}
+            disabled={listening || isLoading}
             style={styles.micBtn}
           >
-            Every Day English Practice 
+            Start Listening
+          </button>
+          <button 
+            onClick={stopListening} 
+            disabled={!listening}
+            style={{...styles.micBtn, marginLeft: '10px', color: 'red'}}
+          >
+            Stop
           </button>
 
           <p style={styles.status}>
-            {isListening ? "English Speaking Practice" : "English-Speaking-Practice"}
+            {listening ? "Listening... Speak now!" : "Tap Start to Begin"}
           </p>
-        </div>
+          {error && <p style={styles.error}>{error}</p>}
 
+          {/* Language Toggle */}
+          <div style={{ marginTop: '10px' }}>
+            <button onClick={() => setLang('hi-IN')} style={styles.langBtn}>Hindi</button>
+            <button onClick={() => setLang('en-US')} style={styles.langBtn}>English</button>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
 const styles = {
-
-  /* ===== FULL MOBILE FIT FIX ===== */
   container: { 
     width: '100vw',
     height: '100vh',
@@ -118,7 +167,6 @@ const styles = {
     flexDirection:'column',
     justifyContent:'space-between'
   },
-  /* ===== END FIX ===== */
 
   inputWrapper: { textAlign: 'center', marginBottom: '10px' },
 
@@ -128,7 +176,8 @@ const styles = {
     color: '#0ddd06',
     fontSize: '15px',
     transition: '0.3s',
-    background:'transparent'
+    background:'transparent',
+    padding: '10px'
   },
 
   status: { 
@@ -164,6 +213,21 @@ const styles = {
     fontWeight: 'bold', 
     margin: '5px 0', 
     color: '#fd1313' 
+  },
+
+  error: {
+    color: 'red',
+    fontSize: '12px',
+    marginTop: '5px'
+  },
+
+  langBtn: {
+    margin: '0 5px',
+    padding: '5px 10px',
+    fontSize: '12px',
+    background: '#ddd',
+    border: 'none',
+    borderRadius: '5px'
   }
 };
 
