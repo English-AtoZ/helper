@@ -6,52 +6,62 @@ const LearnWithAudio = () => {
   const [englishTranslation, setEnglishTranslation] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [lang, setLang] = useState('hi-IN'); // Toggle for testing
   const recognitionRef = useRef(null);
 
   useEffect(() => {
-    // Check for HTTPS (required on mobile)
+    // HTTPS check
     if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-      setError('Speech recognition requires HTTPS on mobile. Please use a secure connection.');
+      setError('Speech recognition requires HTTPS on mobile. Deploy to a secure server.');
       return;
     }
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.lang = 'hi-IN';
-      recognitionRef.current.continuous = false; // Keep false for mobile stability
+      recognitionRef.current.lang = lang;
+      recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
 
       recognitionRef.current.onstart = () => {
+        console.log('Speech recognition started');
         setIsListening(true);
         setError('');
       };
 
       recognitionRef.current.onresult = async (event) => {
+        console.log('Speech result received:', event.results);
         const text = event.results[0][0].transcript;
         setHindiText(text);
         await translateToEnglish(text);
       };
 
       recognitionRef.current.onend = () => {
+        console.log('Speech recognition ended');
         setIsListening(false);
       };
 
       recognitionRef.current.onerror = (event) => {
+        console.error('Speech recognition error:', event.error, event);
         setIsListening(false);
         let errorMsg = 'Speech recognition error: ' + event.error;
         if (event.error === 'not-allowed') {
-          errorMsg += ' - Please allow microphone access in browser settings.';
+          errorMsg += ' - Allow microphone in browser settings.';
         } else if (event.error === 'network') {
-          errorMsg += ' - Check your internet connection.';
+          errorMsg += ' - Check internet.';
+        } else if (event.error === 'no-speech') {
+          errorMsg += ' - No speech detected. Speak louder or closer to mic.';
         }
         setError(errorMsg);
-        console.error('Speech recognition error:', event.error, event);
       };
+
+      recognitionRef.current.onaudiostart = () => console.log('Audio started');
+      recognitionRef.current.onaudioend = () => console.log('Audio ended');
+      recognitionRef.current.onnomatch = () => console.log('No match found');
     } else {
-      setError('Speech recognition not supported in this browser. Try Chrome on Android.');
+      setError('Speech recognition not supported. Use Chrome on Android.');
     }
-  }, []);
+  }, [lang]); // Re-init on lang change
 
   const translateToEnglish = async (text) => {
     if (!text) return;
@@ -64,8 +74,8 @@ const LearnWithAudio = () => {
       setEnglishTranslation(translated);
       speakEnglish(translated);
     } catch (error) {
-      setEnglishTranslation("Translation failed. Try again.");
-      setError("Translation error. Check your internet connection.");
+      setEnglishTranslation("Translation failed.");
+      setError("Translation error.");
       console.error('Translation error:', error);
     } finally {
       setIsLoading(false);
@@ -94,28 +104,28 @@ const LearnWithAudio = () => {
     setEnglishTranslation('');
     setError('');
 
-    // Request permission and start immediately (critical for mobile)
+    // Request permission and start
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(() => {
+          console.log('Microphone permission granted');
           try {
             recognitionRef.current.start();
           } catch (err) {
-            setError('Failed to start speech recognition. Try refreshing the page or checking permissions.');
-            console.error('Start recognition error:', err);
+            console.error('Start error:', err);
+            setError('Failed to start. Try again or refresh.');
           }
         })
         .catch((err) => {
-          setError("Microphone permission denied. Go to browser settings > Site settings > Microphone and allow access.");
-          console.error('Microphone permission error:', err);
+          console.error('Permission error:', err);
+          setError("Microphone denied. Allow in settings.");
         });
     } else {
-      // Fallback for older browsers
       try {
         recognitionRef.current.start();
       } catch (err) {
-        setError('Failed to start speech recognition. Update your browser.');
-        console.error('Start recognition error:', err);
+        console.error('Start error:', err);
+        setError('Failed to start.');
       }
     }
   };
@@ -125,7 +135,7 @@ const LearnWithAudio = () => {
       <div style={styles.innerWrap}>
         <div style={styles.displayArea}>
           <div style={styles.resultBox}>
-            <small>Hindi Sentences:</small>
+            <small>{lang === 'hi-IN' ? 'Hindi Sentences' : 'English Input'}:</small>
             <p style={styles.hindiText}>{hindiText || "..."}</p>
           </div>
 
@@ -147,9 +157,15 @@ const LearnWithAudio = () => {
           </button>
 
           <p style={styles.status}>
-            {isListening ? "English Speaking Practice" : "English-Speaking-Practice"}
+            {isListening ? "Listening..." : "Tap to Start"}
           </p>
           {error && <p style={styles.error}>{error}</p>}
+
+          {/* Language Toggle for Testing */}
+          <div style={{ marginTop: '10px' }}>
+            <button onClick={() => setLang('hi-IN')} style={styles.langBtn}>Hindi</button>
+            <button onClick={() => setLang('en-US')} style={styles.langBtn}>English</button>
+          </div>
         </div>
       </div>
     </div>
@@ -228,6 +244,15 @@ const styles = {
     color: 'red',
     fontSize: '12px',
     marginTop: '5px'
+  },
+
+  langBtn: {
+    margin: '0 5px',
+    padding: '5px 10px',
+    fontSize: '12px',
+    background: '#ddd',
+    border: 'none',
+    borderRadius: '5px'
   }
 };
 
