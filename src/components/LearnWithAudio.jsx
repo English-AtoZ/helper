@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useEffect, useRef } from 'react';
 
 const LearnWithAudio = () => {
@@ -9,16 +5,22 @@ const LearnWithAudio = () => {
   const [hindiText, setHindiText] = useState('');
   const [englishTranslation, setEnglishTranslation] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(''); // Added for error display
+  const [error, setError] = useState('');
   const recognitionRef = useRef(null);
 
   useEffect(() => {
+    // Check for HTTPS (required on mobile)
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+      setError('Speech recognition requires HTTPS on mobile. Please use a secure connection.');
+      return;
+    }
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.lang = 'hi-IN';
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false; // Ensure no interim results for mobile compatibility
+      recognitionRef.current.continuous = false; // Keep false for mobile stability
+      recognitionRef.current.interimResults = false;
 
       recognitionRef.current.onstart = () => {
         setIsListening(true);
@@ -37,11 +39,17 @@ const LearnWithAudio = () => {
 
       recognitionRef.current.onerror = (event) => {
         setIsListening(false);
-        setError(`Speech recognition error: ${event.error}`);
-        console.error('Speech recognition error:', event.error);
+        let errorMsg = 'Speech recognition error: ' + event.error;
+        if (event.error === 'not-allowed') {
+          errorMsg += ' - Please allow microphone access in browser settings.';
+        } else if (event.error === 'network') {
+          errorMsg += ' - Check your internet connection.';
+        }
+        setError(errorMsg);
+        console.error('Speech recognition error:', event.error, event);
       };
     } else {
-      setError('Speech recognition not supported in this browser.');
+      setError('Speech recognition not supported in this browser. Try Chrome on Android.');
     }
   }, []);
 
@@ -76,21 +84,7 @@ const LearnWithAudio = () => {
     }
   };
 
-  const requestMicrophonePermission = async () => {
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-        return true;
-      } catch (err) {
-        setError("Microphone permission denied. Please allow microphone access.");
-        console.error('Microphone permission error:', err);
-        return false;
-      }
-    }
-    return true; // Assume permission if getUserMedia not available
-  };
-
-  const startListening = async () => {
+  const startListening = () => {
     if (!recognitionRef.current) {
       setError('Speech recognition not available.');
       return;
@@ -100,15 +94,29 @@ const LearnWithAudio = () => {
     setEnglishTranslation('');
     setError('');
 
-    // Request microphone permission first (important for mobile)
-    const hasPermission = await requestMicrophonePermission();
-    if (!hasPermission) return;
-
-    try {
-      recognitionRef.current.start();
-    } catch (err) {
-      setError('Failed to start speech recognition. Try again.');
-      console.error('Start recognition error:', err);
+    // Request permission and start immediately (critical for mobile)
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(() => {
+          try {
+            recognitionRef.current.start();
+          } catch (err) {
+            setError('Failed to start speech recognition. Try refreshing the page or checking permissions.');
+            console.error('Start recognition error:', err);
+          }
+        })
+        .catch((err) => {
+          setError("Microphone permission denied. Go to browser settings > Site settings > Microphone and allow access.");
+          console.error('Microphone permission error:', err);
+        });
+    } else {
+      // Fallback for older browsers
+      try {
+        recognitionRef.current.start();
+      } catch (err) {
+        setError('Failed to start speech recognition. Update your browser.');
+        console.error('Start recognition error:', err);
+      }
     }
   };
 
@@ -141,7 +149,7 @@ const LearnWithAudio = () => {
           <p style={styles.status}>
             {isListening ? "English Speaking Practice" : "English-Speaking-Practice"}
           </p>
-          {error && <p style={styles.error}>{error}</p>} {/* Display errors */}
+          {error && <p style={styles.error}>{error}</p>}
         </div>
       </div>
     </div>
@@ -149,7 +157,6 @@ const LearnWithAudio = () => {
 };
 
 const styles = {
-  /* ===== FULL MOBILE FIT FIX ===== */
   container: { 
     width: '100vw',
     height: '100vh',
@@ -170,7 +177,6 @@ const styles = {
     flexDirection:'column',
     justifyContent:'space-between'
   },
-  /* ===== END FIX ===== */
 
   inputWrapper: { textAlign: 'center', marginBottom: '10px' },
 
