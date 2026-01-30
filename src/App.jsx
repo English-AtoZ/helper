@@ -11,14 +11,37 @@ function App() {
   const [adShown, setAdShown] = useState(false);
   const [timer, setTimer] = useState(0);
 
+  // Top Ad Script
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.innerHTML = `
+      atOptions = {
+        'key' : 'b08bb8c33e3d7563562686618ec84848',
+        'format' : 'iframe',
+        'height' : 90,
+        'width' : 728,
+        'params' : {}
+      };
+    `;
+    const scriptSrc = document.createElement("script");
+    scriptSrc.src = "https://www.highperformanceformat.com/b08bb8c33e3d7563562686618ec84848/invoke.js";
+    scriptSrc.async = true;
+
+    document.body.prepend(script);
+    document.body.prepend(scriptSrc);
+
+    return () => {
+      script.remove();
+      scriptSrc.remove();
+    };
+  }, []);
+
   // Timer countdown
   useEffect(() => {
     if (timer > 0) {
       const interval = setInterval(() => setTimer((t) => t - 1), 1000);
       return () => clearInterval(interval);
     }
-
-    // Timer finished → component already set in handleOpen
   }, [timer]);
 
   const handleOpen = (pageName) => {
@@ -52,12 +75,17 @@ function App() {
   }
 
   return (
-    <div style={{ width: "100vw", height: "100vh" }}>
+    <div style={{ width: "100vw", height: "100vh", position: "relative" }}>
+
+      {/* Top Ad Placeholder */}
+      <div style={{ width: "100%", textAlign: "center", marginBottom: "20px" }}>
+        <div id="top-ad"></div>
+      </div>
 
       {/* Home Buttons */}
       {!activePage && (
         <div style={{
-          height: "100vh",
+          height: "calc(100vh - 350px)",
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
@@ -71,8 +99,6 @@ function App() {
           <button onClick={() => handleOpen("englishToHindi")}>
             English → Hindi Practice
           </button>
-
-
 
           <button onClick={() => handleOpen("hindiToSansikrit")}>
             Hindi → Sanskirit Practice
@@ -89,6 +115,24 @@ function App() {
       {activePage === "englishToHindi" && <LearnWithAudioEnglish />}
       {activePage === "audios3Bolkar" && <Audios3Bolkar />}
       {activePage === "hindiToSansikrit" && <HindiToSansikritAudio />}
+
+      {/* Bottom Ad Script */}
+      <div id="bottom-ad" style={{ position: "absolute", bottom: 0, right: 0 }}>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              atOptions = {
+                'key' : 'cf112d050bf90b1a1ddf6ab695fbde86',
+                'format' : 'iframe',
+                'height' : 250,
+                'width' : 300,
+                'params' : {}
+              };
+            `
+          }}
+        ></script>
+        <script src="https://www.highperformanceformat.com/cf112d050bf90b1a1ddf6ab695fbde86/invoke.js"></script>
+      </div>
     </div>
   );
 }
