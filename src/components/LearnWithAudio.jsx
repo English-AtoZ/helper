@@ -160,7 +160,7 @@ const styles = {
 
   innerWrap:{
     width:'100%',
-    height:'50%',
+    height:'95%',
     padding:'20px',
     boxSizing:'border-box',
     display:'flex',
